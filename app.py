@@ -108,9 +108,15 @@ if prompt := st.chat_input("在这里输入你的问题..."):
 
                 placeholder.markdown(full_response)
 
+                # 保存 AI 回复（只在成功时）
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": full_response}
+                )
+
             except Exception as e:
                 st.error(f"❌ 出错了: {str(e)}")
                 st.info("💡 常见原因：API Key 无效、余额不足、或网络问题")
 
-    # 保存 AI 回复
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                # 移除用户消息（避免对话历史出问题）
+                st.session_state.messages.pop()
+                st.stop()
