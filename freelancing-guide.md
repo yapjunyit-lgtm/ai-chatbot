@@ -133,6 +133,45 @@ Why me:
 
 ---
 
+---
+
+## Gig 4: 📊 AI Data Analyst — Auto Insights & Charts
+
+**Title (Fiverr)**:
+> I will build an AI data analyst that auto-generates charts and insights from your data
+
+**Title (Upwork)**:
+> Build AI Data Dashboard – Upload CSV, Get Auto Charts + AI Insights + NL Query
+
+**Description**:
+```
+Upload a spreadsheet, get a full analysis in seconds. My AI Data Analyst does what a junior analyst takes days to do — instantly.
+
+Perfect for business owners, e-commerce sellers, and managers who have data but don't know how to read it.
+
+Features:
+📋 Auto data profiling — column types, missing values, summary stats
+📈 7 chart types — bar, line, pie, box, violin, scatter, heatmap
+🤖 AI insights — upload and click, AI finds key findings + trends + action items
+💬 Ask in plain English — "Which product sells best?" "Is there a correlation between price and sales?"
+
+Why me:
+🔹 4 production AI apps built & live (test them all)
+🔹 Interactive Plotly charts — not static images
+🔹 Works with any CSV or Excel file you throw at it
+
+📩 Message me — I'll customize this for YOUR specific business data.
+```
+
+**Pricing (Fiverr)**:
+| Package | Price | Delivery |
+|---------|-------|----------|
+| Basic | $30 (RM 140) | 2 days — Standard data analyzer |
+| Standard | $80 (RM 370) | 4 days — Custom dashboards + KPIs |
+| Premium | $150 (RM 690) | 7 days — Live data connection + scheduled reports |
+
+---
+
 ## 💡 Fiverr Gig 优化技巧
 
 ### 1. Gig 图片怎么做
@@ -149,6 +188,7 @@ Why me:
 - Gig 1: `ai chatbot`, `chatbot development`, `openai`, `customer support`
 - Gig 2: `ai pdf`, `document analysis`, `pdf summarizer`, `ai assistant`
 - Gig 3: `ai content`, `content generator`, `seo writing`, `copywriting`
+- Gig 4: `data analysis`, `ai dashboard`, `data visualization`, `business intelligence`
 
 ### 4. 响应时间
 - Fiverr 看重响应速度，手机装 Fiverr App，1 小时内回复
