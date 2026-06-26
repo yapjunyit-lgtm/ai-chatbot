@@ -219,13 +219,14 @@ Use cases:
 
 What you get:
 ✅ 3 default AI slots (expandable up to 8)
+✅ One-click OpenRouter OAuth login — no API key needed
+✅ Access to 200+ models: GPT-4o, Claude, Gemini, DeepSeek, Llama, Grok...
 ✅ Side-by-side streaming responses
 ✅ One-click "Compile" — AI synthesizes the best final answer
-✅ Works with OpenAI, DeepSeek, Groq, Claude, OpenRouter
-✅ Shared API key — configure once, use everywhere
 
 Why me:
 🔹 5 production AI apps live (test them all)
+🔹 Login, not API keys — your clients don't need technical knowledge
 🔹 This is a unique tool — very few sellers offer multi-model comparison
 🔹 Clean, professional UI
 
