@@ -1,120 +1,99 @@
 """
-⚡ AI Compiler — 一个 Prompt 同时发给多个 AI，并排对比，一键编译合成
-🔑 一键登录 OpenRouter，无需手动输入 API Key
+⚡ AI Compiler v3 — 一个 Prompt 同时发给多个 AI，并排对比，一键编译
+💰 极致省钱：每家默认最便宜模型，旁边标价格，🆓 免费模型优先
 """
 import streamlit as st
-import requests
-import urllib.parse
-import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
-# ── 常量 ────────────────────────────────────────────────────
-OPENROUTER_AUTH_URL = "https://openrouter.ai/auth"
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_KEY_EXCHANGE = f"{OPENROUTER_API_URL}/auth/keys"
-OPENROUTER_MODELS_URL = f"{OPENROUTER_API_URL}/models"
+load_dotenv()
 
-# 默认槽位（OpenRouter 格式模型名）
+# ── 供应商配置 ──────────────────────────────────────────────
+# price_tag: 💰 = 付费但便宜, 🆓 = 免费层可用
+PROVIDERS = {
+    "DeepSeek": {
+        "prefixes": ["sk-"],
+        "base_url": "https://api.deepseek.com/v1",
+        "models": ["deepseek-chat", "deepseek-reasoner"],
+        "price": "💰 ¥0.14/百万token",
+        "free_tier": "注册送额度",
+        "get_key_url": "https://platform.deepseek.com/api_keys",
+    },
+    "Google Gemini": {
+        "prefixes": ["AIza"],
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+        "price": "🆓 免费层",
+        "free_tier": "每分钟60次免费",
+        "get_key_url": "https://aistudio.google.com/apikey",
+    },
+    "Groq": {
+        "prefixes": ["gsk_"],
+        "base_url": "https://api.groq.com/openai/v1",
+        "models": ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "mixtral-8x7b-32768", "qwen-2.5-32b"],
+        "price": "🆓 免费层",
+        "free_tier": "速率限制",
+        "get_key_url": "https://console.groq.com/keys",
+    },
+    "OpenAI": {
+        "prefixes": ["sk-proj-", "sk-admin-"],
+        "base_url": "https://api.openai.com/v1",
+        "models": ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "o4-mini"],
+        "price": "💰 $0.15/百万token",
+        "free_tier": "新用户送$5",
+        "get_key_url": "https://platform.openai.com/api-keys",
+    },
+    "Mistral": {
+        "prefixes": ["ms-"],
+        "base_url": "https://api.mistral.ai/v1",
+        "models": ["mistral-small-latest", "mistral-large-latest", "pixtral-large-latest"],
+        "price": "🆓 免费层",
+        "free_tier": "每秒1次免费",
+        "get_key_url": "https://console.mistral.ai/api-keys/",
+    },
+    "Together AI": {
+        "prefixes": ["tgp_"],
+        "base_url": "https://api.together.xyz/v1",
+        "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1", "Qwen/Qwen2.5-72B-Instruct-Turbo"],
+        "price": "💰 $0.10/百万token",
+        "free_tier": "注册送$5",
+        "get_key_url": "https://api.together.ai/settings/api-keys",
+    },
+    "OpenRouter": {
+        "prefixes": ["sk-or-"],
+        "base_url": "https://openrouter.ai/api/v1",
+        "models": ["openai/gpt-4o-mini", "google/gemini-2.0-flash", "deepseek/deepseek-chat"],
+        "price": "💰 聚合加价",
+        "free_tier": "无免费层",
+        "get_key_url": "https://openrouter.ai/keys",
+    },
+}
+
+# ── 默认槽位（最便宜方案）───────────────────────────────────
 DEFAULT_SLOTS = [
-    {"model": "openai/gpt-4o"},
-    {"model": "anthropic/claude-sonnet-4-6"},
-    {"model": "google/gemini-2.5-pro"},
-]
-
-# 热门模型快捷列表（首次加载/网络失败时的后备）
-POPULAR_MODELS = [
-    # OpenAI
-    "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4o", "openai/gpt-4o-mini",
-    "openai/o4-mini", "openai/o3-mini",
-    # Anthropic
-    "anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-8",
-    "anthropic/claude-haiku-4-5", "anthropic/claude-fable-5",
-    # Google
-    "google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-2.0-flash",
-    # Meta
-    "meta-llama/llama-4-maverick", "meta-llama/llama-3.3-70b-instruct",
-    # DeepSeek
-    "deepseek/deepseek-chat", "deepseek/deepseek-r1",
-    # Mistral
-    "mistralai/mistral-large", "mistralai/mixtral-8x22b",
-    # Qwen
-    "qwen/qwen-2.5-72b-instruct", "qwen/qwq-32b",
-    # xAI
-    "x-ai/grok-3-beta",
+    {"provider": "DeepSeek", "model": "deepseek-chat"},
+    {"provider": "Google Gemini", "model": "gemini-2.0-flash"},
+    {"provider": "Groq", "model": "llama-3.1-8b-instant"},
 ]
 
 
-# ── OAuth 逻辑 ──────────────────────────────────────────────
-def get_app_url():
-    """获取当前 App 的完整 URL（用作 OAuth callback）"""
-    try:
-        # Streamlit Cloud 环境
-        if "STREAMLIT_SERVER_PORT" in os.environ:
-            port = os.environ.get("STREAMLIT_SERVER_PORT", "8501")
-            return f"http://localhost:{port}"
-    except Exception:
-        pass
-    return "http://localhost:8505"
+def detect_provider(api_key: str):
+    for name, config in PROVIDERS.items():
+        for prefix in config["prefixes"]:
+            if api_key.startswith(prefix):
+                return name, config
+    return None, None
 
 
-def exchange_code_for_key(code: str) -> str | None:
-    """用 OAuth code 换取 OpenRouter API Key"""
-    try:
-        resp = requests.post(
-            OPENROUTER_KEY_EXCHANGE,
-            json={"code": code},
-            headers={"Content-Type": "application/json"},
-            timeout=15,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("key")
-        else:
-            st.error(f"❌ 换取 Key 失败 ({resp.status_code}): {resp.text[:300]}")
-            return None
-    except Exception as e:
-        st.error(f"❌ 网络错误: {e}")
-        return None
-
-
-def get_openrouter_models(api_key: str) -> list[str]:
-    """从 OpenRouter 拉取可用模型列表"""
-    try:
-        resp = requests.get(
-            OPENROUTER_MODELS_URL,
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=15,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            models = []
-            for m in data.get("data", []):
-                model_id = m.get("id", "")
-                # 过滤掉不合适的模型
-                if model_id and not any(skip in model_id.lower() for skip in [
-                    "evl-", "liquid-", "nvidia/", ":free", ":extended",
-                ]):
-                    models.append(model_id)
-            return sorted(models)
-        else:
-            return POPULAR_MODELS
-    except Exception:
-        return POPULAR_MODELS
-
-
-def call_ai(messages: list, api_key: str, model: str, temperature: float, max_tokens: int):
-    """流式调用 AI — 全部通过 OpenRouter API"""
-    client = OpenAI(api_key=api_key, base_url=OPENROUTER_API_URL)
+def call_ai(messages: list, api_key: str, model: str, temperature: float, max_tokens: int, base_url: str):
+    """流式调用 AI — 全部走 OpenAI 兼容接口"""
+    client = OpenAI(api_key=api_key, base_url=base_url)
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
         stream=True,
-        extra_headers={
-            "HTTP-Referer": get_app_url(),
-            "X-Title": "AI Compiler",
-        },
     )
     for chunk in response:
         if chunk.choices[0].delta.content:
@@ -125,14 +104,14 @@ def call_ai(messages: list, api_key: str, model: str, temperature: float, max_to
 st.set_page_config(page_title="⚡ AI Compiler", page_icon="⚡", layout="wide")
 
 st.title("⚡ AI Compiler")
-st.caption("一个 Prompt → 多个 AI 同时回答 → 并排对比 → 一键编译合成最优答案")
+st.caption("一个 Prompt → 多个 AI 同时回答 → 并排对比 → 一键编译最优答案")
 
 # ── 初始化 session ─────────────────────────────────────────
-if "api_key" not in st.session_state:
-    st.session_state.api_key = None
-
 if "slots" not in st.session_state:
     st.session_state.slots = [dict(s) for s in DEFAULT_SLOTS]
+
+if "slot_keys" not in st.session_state:
+    st.session_state.slot_keys = {}
 
 if "slot_responses" not in st.session_state:
     st.session_state.slot_responses = {}
@@ -140,80 +119,9 @@ if "slot_responses" not in st.session_state:
 if "compile_response" not in st.session_state:
     st.session_state.compile_response = ""
 
-if "models_cache" not in st.session_state:
-    st.session_state.models_cache = POPULAR_MODELS
-
-# ── OAuth 回调处理 ─────────────────────────────────────────
-query_params = st.query_params
-if "code" in query_params and not st.session_state.api_key:
-    code = query_params["code"]
-    with st.spinner("🔑 正在登录 OpenRouter..."):
-        key = exchange_code_for_key(code)
-        if key:
-            st.session_state.api_key = key
-            # 拉取模型列表
-            st.session_state.models_cache = get_openrouter_models(key)
-            st.query_params.clear()
-            st.rerun()
-        else:
-            st.error("登录失败，请重试。")
-            st.query_params.clear()
-            st.rerun()
-
 # ── 侧边栏 ────────────────────────────────────────────────
 with st.sidebar:
-    st.header("🔑 账户")
-
-    if st.session_state.api_key:
-        st.success(f"✅ 已登录 OpenRouter")
-
-        # 拉取模型列表（如果还没拉）
-        if st.button("🔄 刷新模型列表"):
-            st.session_state.models_cache = get_openrouter_models(st.session_state.api_key)
-            st.rerun()
-
-        st.metric("可用模型", len(st.session_state.models_cache))
-
-        if st.button("🚪 登出", use_container_width=True):
-            st.session_state.api_key = None
-            st.session_state.slot_responses = {}
-            st.session_state.compile_response = ""
-            st.rerun()
-    else:
-        st.warning("⚠️ 未登录")
-
-        # 登录按钮
-        app_url = get_app_url()
-        callback_url = urllib.parse.quote(app_url, safe="")
-        login_url = f"{OPENROUTER_AUTH_URL}?callback_url={callback_url}"
-
-        st.markdown(f"""
-        <a href="{login_url}" target="_self">
-            <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; padding: 14px 20px; border-radius: 10px;
-                text-align: center; font-size: 16px; font-weight: bold;
-                cursor: pointer; margin: 10px 0;
-            ">
-                🔑 登录 OpenRouter
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
-
-        st.caption("""
-        **不需要 API Key！**
-        点击登录 → 跳转 OpenRouter 授权 → 自动回来。
-
-        一个账号访问 200+ 模型：
-        GPT-4o · Claude · Gemini · DeepSeek · Llama · Grok · Qwen
-        """)
-
-        st.info("💡 首次使用需要注册 [OpenRouter](https://openrouter.ai) 账号（免费）")
-
-    st.divider()
-
-    # ── 全局设置 ──
-    st.header("⚙️ 参数设置")
+    st.header("⚙️ 全局设置")
 
     temperature = st.slider("创造性 (Temperature)", 0.0, 2.0, 0.7, 0.1)
     max_tokens = st.slider("最大输出长度", 256, 8192, 2048, 128)
@@ -222,34 +130,70 @@ with st.sidebar:
 
     # ── 槽位配置 ──
     st.header("📊 槽位配置")
-    models = st.session_state.models_cache
     slots_to_remove = []
 
     for idx, slot in enumerate(st.session_state.slots):
-        model = slot["model"]
-        with st.expander(f"🔹 Slot {idx + 1}: `{model}`", expanded=len(st.session_state.slots) <= 3):
-            col_a, col_b = st.columns([4, 1])
+        provider = slot["provider"]
+        config = PROVIDERS.get(provider, {})
+        price = config.get("price", "")
+        get_key = config.get("get_key_url", "#")
 
-            with col_a:
-                # 找当前模型在列表中的位置
-                try:
-                    current_idx = models.index(model)
-                except ValueError:
-                    current_idx = 0
+        with st.expander(
+            f"🔹 Slot {idx + 1}: {provider} — `{slot['model']}`  {price}",
+            expanded=len(st.session_state.slots) <= 3,
+        ):
+            # ── 供应商选择 ──
+            provider_names = list(PROVIDERS.keys())
+            current_pidx = provider_names.index(provider) if provider in provider_names else 0
+            new_provider = st.selectbox(
+                "供应商",
+                options=provider_names,
+                index=current_pidx,
+                key=f"slot_provider_{idx}",
+            )
+            slot["provider"] = new_provider
+            new_config = PROVIDERS[new_provider]
 
-                new_model = st.selectbox(
-                    "模型",
-                    options=models,
-                    index=current_idx,
-                    key=f"slot_model_{idx}",
-                    help=f"搜索模型名...",
+            # ── API Key 输入 ──
+            key_col1, key_col2 = st.columns([3, 1])
+            with key_col1:
+                default_key = st.session_state.slot_keys.get(idx, "")
+                api_key = st.text_input(
+                    "API Key",
+                    type="password",
+                    value=default_key,
+                    placeholder=f"粘贴 {new_provider} Key...",
+                    key=f"slot_key_{idx}",
                 )
-                slot["model"] = new_model
+                if api_key:
+                    st.session_state.slot_keys[idx] = api_key
 
-            with col_b:
-                st.caption(" ")
-                if st.button("🗑", key=f"remove_{idx}", help="移除此槽位"):
-                    slots_to_remove.append(idx)
+            with key_col2:
+                st.markdown(f"""<a href="{new_config.get('get_key_url', '#')}" target="_blank">
+                    <div style="font-size:12px; color:#667eea; margin-top:28px;">🔗 获取 Key</div>
+                </a>""", unsafe_allow_html=True)
+
+            # ── 价格信息 ──
+            st.caption(f"{new_config.get('price', '')}  |  {new_config.get('free_tier', '')}")
+
+            # ── 模型选择 ──
+            models = new_config["models"]
+            try:
+                current_midx = models.index(slot["model"]) if slot["model"] in models else 0
+            except ValueError:
+                current_midx = 0
+            slot["model"] = st.selectbox(
+                "模型",
+                options=models,
+                index=current_midx,
+                key=f"slot_model_{idx}",
+            )
+
+            # ── 检测 Key ──
+            if api_key:
+                detected, _ = detect_provider(api_key)
+                if detected and detected != new_provider:
+                    st.warning(f"⚠️ Key 看起来是 {detected} 的，但你选了 {new_provider}")
 
     # 处理移除
     for idx in reversed(slots_to_remove):
@@ -260,7 +204,7 @@ with st.sidebar:
     # 添加槽位
     if len(st.session_state.slots) < 8:
         if st.button("➕ 添加槽位", use_container_width=True):
-            st.session_state.slots.append({"model": models[0] if models else "openai/gpt-4o-mini"})
+            st.session_state.slots.append({"provider": "OpenAI", "model": "gpt-4o-mini"})
             st.rerun()
 
     st.caption(f"共 **{len(st.session_state.slots)}** 个槽位（最多 8 个）")
@@ -272,115 +216,144 @@ with st.sidebar:
     compile_slot_idx = st.selectbox(
         "用哪个槽位做编译？",
         options=list(range(len(st.session_state.slots))),
-        format_func=lambda i: f"Slot {i+1}: {st.session_state.slots[i]['model']}",
+        format_func=lambda i: f"Slot {i+1}: {st.session_state.slots[i]['provider']}",
     )
 
     st.divider()
 
-    if st.button("🗑 清空全部回复", use_container_width=True):
-        st.session_state.slot_responses = {}
-        st.session_state.compile_response = ""
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑 清空回复", use_container_width=True):
+            st.session_state.slot_responses = {}
+            st.session_state.compile_response = ""
+            st.rerun()
+    with col2:
+        if st.button("🗑 清空 Key", use_container_width=True):
+            st.session_state.slot_keys = {}
+            st.rerun()
+
+    # ── 免费 Key 获取指引 ──
+    st.divider()
+    st.subheader("🆓 免费 Key 获取")
+    for name, config in PROVIDERS.items():
+        if "🆓" in config.get("price", ""):
+            st.markdown(f"🔗 [{name}]({config.get('get_key_url', '#')}) — {config.get('free_tier', '')}")
 
 # ── 主区域 ────────────────────────────────────────────────
-if not st.session_state.api_key:
-    st.info("👈 请先在侧边栏登录 OpenRouter。一个账号，访问所有 AI 模型。")
-else:
-    st.subheader("💬 输入 Prompt")
-    prompt = st.chat_input("输入你的问题，所有 AI 会同时回答...")
+st.subheader("💬 输入 Prompt")
+prompt = st.chat_input("输入你的问题，所有 AI 会同时回答...")
 
-    # ── 结果区域：N 列并排 ──
-    num_slots = len(st.session_state.slots)
-    if num_slots > 0:
-        st.subheader(f"📊 {num_slots} 个 AI 对比")
-        result_cols = st.columns(num_slots)
+# ── 结果区域：N 列并排 ──
+num_slots = len(st.session_state.slots)
+if num_slots > 0:
+    st.subheader(f"📊 {num_slots} 个 AI 对比")
+    result_cols = st.columns(num_slots)
 
-        for idx, (col, slot) in enumerate(zip(result_cols, st.session_state.slots)):
-            with col:
-                model = slot["model"]
-                st.markdown(f"**Slot {idx + 1}**")
-                st.caption(f"`{model}`")
+    for idx, (col, slot) in enumerate(zip(result_cols, st.session_state.slots)):
+        with col:
+            provider = slot["provider"]
+            model = slot["model"]
+            config = PROVIDERS.get(provider, {})
+            api_key = st.session_state.slot_keys.get(idx, "")
+            price = config.get("price", "")
 
-                placeholder = st.empty()
+            st.markdown(f"**Slot {idx + 1}**")
+            st.caption(f"{provider} · `{model}`  {price}")
 
-                if prompt:
-                    slot_key = f"{idx}_{prompt}"
-                    if slot_key not in st.session_state.slot_responses:
-                        with st.spinner("⏳ 思考中..."):
-                            try:
-                                messages = [{"role": "user", "content": prompt}]
-                                full = ""
-                                for token in call_ai(messages, st.session_state.api_key, model, temperature, max_tokens):
-                                    full += token
-                                    placeholder.markdown(full + "▌")
-                                placeholder.markdown(full)
-                                st.session_state.slot_responses[slot_key] = full
-                            except Exception as e:
-                                error_msg = str(e)[:200]
-                                placeholder.error(f"❌ {error_msg}")
-                                st.session_state.slot_responses[slot_key] = f"**错误**: {error_msg}"
-                    else:
-                        placeholder.markdown(st.session_state.slot_responses[slot_key])
+            placeholder = st.empty()
+
+            if not api_key:
+                placeholder.warning("🔑 需要 API Key")
+            elif prompt:
+                slot_key = f"{idx}_{prompt}_{model}"
+                if slot_key not in st.session_state.slot_responses:
+                    with st.spinner("⏳ 思考中..."):
+                        try:
+                            messages = [{"role": "user", "content": prompt}]
+                            full = ""
+                            for token in call_ai(
+                                messages, api_key, model, temperature, max_tokens,
+                                config.get("base_url", ""),
+                            ):
+                                full += token
+                                placeholder.markdown(full + "▌")
+                            placeholder.markdown(full)
+                            st.session_state.slot_responses[slot_key] = full
+                        except Exception as e:
+                            error_msg = str(e)[:200]
+                            placeholder.error(f"❌ {error_msg}")
+                            st.session_state.slot_responses[slot_key] = f"**错误**: {error_msg}"
                 else:
-                    placeholder.info("等待输入...")
+                    placeholder.markdown(st.session_state.slot_responses[slot_key])
+            else:
+                placeholder.info("等待输入...")
 
-    # ── 编译合成 ──
-    if prompt and num_slots > 1:
+# ── 编译合成 ──
+if prompt and num_slots > 1:
+    # 检查至少 2 个槽位有回复
+    ready_slots = []
+    for idx in range(num_slots):
+        slot = st.session_state.slots[idx]
+        slot_key = f"{idx}_{prompt}_{slot['model']}"
+        if slot_key in st.session_state.slot_responses:
+            ready_slots.append((idx, slot, slot_key))
+
+    if len(ready_slots) >= 2:
         st.divider()
         st.subheader("🎯 编译合成")
 
-        slot_keys_for_prompt = [f"{idx}_{prompt}" for idx in range(num_slots)]
-        all_ready = all(k in st.session_state.slot_responses for k in slot_keys_for_prompt)
+        compile_model = st.session_state.slots[compile_slot_idx]["model"]
+        compile_provider = st.session_state.slots[compile_slot_idx]["provider"]
+        compile_config = PROVIDERS.get(compile_provider, {})
+        compile_key = st.session_state.slot_keys.get(compile_slot_idx, "")
 
-        if all_ready:
-            compile_model = st.session_state.slots[compile_slot_idx]["model"]
+        compile_btn = st.button(
+            f"🚀 用 Slot {compile_slot_idx + 1} (`{compile_model}`) 编译合成",
+            type="primary", use_container_width=True,
+            disabled=not compile_key,
+        )
 
-            compile_btn = st.button(
-                f"🚀 用 Slot {compile_slot_idx + 1} (`{compile_model}`) 编译合成",
-                type="primary", use_container_width=True,
-            )
+        if compile_btn and compile_key:
+            # 构建编译 prompt
+            responses_text = ""
+            for idx, slot, slot_key in ready_slots:
+                response = st.session_state.slot_responses.get(slot_key, "")
+                responses_text += f"\n\n### {slot['provider']} ({slot['model']}):\n{response}"
 
-            if compile_btn:
-                # 构建编译 prompt
-                responses_text = ""
-                for idx in range(num_slots):
-                    response = st.session_state.slot_responses.get(f"{idx}_{prompt}", "")
-                    model = st.session_state.slots[idx]["model"]
-                    responses_text += f"\n\n### AI {idx + 1} ({model}):\n{response}"
+            system_prompt = f"""你是高级综合编辑。以下是 {len(ready_slots)} 个不同 AI 对同一问题的回答。
 
-                system_prompt = f"""You are a senior synthesis editor. Below are {num_slots} different AI responses to the same question.
+请综合所有观点，生成完整准确的最终答案：
+1. 保留各回答的独特见解
+2. 如有矛盾，选逻辑最严密的
+3. 去掉重复信息
+4. 忽略明显错误的回答
+5. 用原问题的语言回答"""
 
-Synthesize them into ONE definitive answer. Rules:
-1. Keep the best unique insights from each response
-2. If responses contradict, prefer the most logically sound one
-3. Remove redundant information
-4. If a response is clearly wrong, ignore it
-5. Structure the final answer clearly and comprehensively
+            compile_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"原始问题：{prompt}\n\n各 AI 回答：{responses_text}\n\n请综合编译。"},
+            ]
 
-Respond in the same language as the original question."""
+            st.markdown("---")
+            st.markdown(f"**📝 编译结果** (由 `{compile_model}` 合成)")
 
-                compile_messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Original question: {prompt}\n\nResponses:{responses_text}\n\nSynthesize into final answer:"},
-                ]
+            compile_placeholder = st.empty()
+            full_compile = ""
 
-                st.markdown("---")
-                st.markdown(f"**📝 编译结果** (由 `{compile_model}` 合成)")
-
-                compile_placeholder = st.empty()
-                full_compile = ""
-
-                try:
-                    for token in call_ai(compile_messages, st.session_state.api_key, compile_model, 0.5, 3072):
-                        full_compile += token
-                        compile_placeholder.markdown(full_compile + "▌")
-                    compile_placeholder.markdown(full_compile)
-                    st.session_state.compile_response = full_compile
-                except Exception as e:
-                    compile_placeholder.error(f"❌ 编译失败: {str(e)[:200]}")
-        else:
-            st.caption("⏳ 等待所有 AI 完成回复...")
+            try:
+                for token in call_ai(
+                    compile_messages, compile_key, compile_model, 0.5, 3072,
+                    compile_config.get("base_url", ""),
+                ):
+                    full_compile += token
+                    compile_placeholder.markdown(full_compile + "▌")
+                compile_placeholder.markdown(full_compile)
+                st.session_state.compile_response = full_compile
+            except Exception as e:
+                compile_placeholder.error(f"❌ 编译失败: {str(e)[:200]}")
+    else:
+        st.caption("⏳ 等待至少 2 个 AI 完成回复...")
 
 # ── Footer ────────────────────────────────────────────────
 st.divider()
-st.caption("💡 通过 OpenRouter 一个账号访问 200+ AI 模型 — GPT-4o · Claude · Gemini · DeepSeek · Llama · Grok · Qwen ...")
+st.caption("💰 省钱技巧：DeepSeek ¥0.14 + Gemini 🆓 + Groq 🆓 = 一次对比几乎免费。每家注册拿免费 Key，不花冤枉钱。")
