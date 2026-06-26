@@ -189,10 +189,55 @@ Why me:
 - Gig 2: `ai pdf`, `document analysis`, `pdf summarizer`, `ai assistant`
 - Gig 3: `ai content`, `content generator`, `seo writing`, `copywriting`
 - Gig 4: `data analysis`, `ai dashboard`, `data visualization`, `business intelligence`
+- Gig 5: `ai comparison`, `multi model`, `ai compiler`, `model evaluation`
 
 ### 4. 响应时间
 - Fiverr 看重响应速度，手机装 Fiverr App，1 小时内回复
 - 回复模板：*"Thanks for reaching out! Let me understand your needs better. [问 1-2 个问题]"*
+
+---
+
+## Gig 5: ⚡ AI Compiler — Multi-Model Showdown
+
+**Title (Fiverr)**:
+> I will build an AI compiler that compares responses from multiple AIs and compiles the best answer
+
+**Title (Upwork)**:
+> Build AI Comparison Engine – Send One Prompt to Multiple AIs & Compile the Best Answer
+
+**Description**:
+```
+Why trust ONE AI when you can ask MANY and pick the best?
+
+My AI Compiler sends your prompt to multiple AI models simultaneously, shows all their responses side-by-side in real-time, then compiles the best answer by synthesizing every response.
+
+Use cases:
+🔹 Get diverse perspectives on complex questions
+🔹 Compare AI models to find the best one for your task
+🔹 Fact-check — if 3/4 models agree, you know it's reliable
+🔹 Content creation — pick the writing style you like best
+
+What you get:
+✅ 3 default AI slots (expandable up to 8)
+✅ Side-by-side streaming responses
+✅ One-click "Compile" — AI synthesizes the best final answer
+✅ Works with OpenAI, DeepSeek, Groq, Claude, OpenRouter
+✅ Shared API key — configure once, use everywhere
+
+Why me:
+🔹 5 production AI apps live (test them all)
+🔹 This is a unique tool — very few sellers offer multi-model comparison
+🔹 Clean, professional UI
+
+📩 Message me — I'll customize slots and layout for your specific needs.
+```
+
+**Pricing (Fiverr)**:
+| Package | Price | Delivery |
+|---------|-------|----------|
+| Basic | $35 (RM 160) | 3 days — 3-slot compiler |
+| Standard | $90 (RM 415) | 5 days — Up to 6 slots + custom UI |
+| Premium | $180 (RM 830) | 7 days — Unlimited slots + saved comparisons |
 
 ---
 
