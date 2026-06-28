@@ -5,6 +5,8 @@
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 load_dotenv()
 
@@ -98,6 +100,54 @@ def call_ai(messages: list, api_key: str, model: str, temperature: float, max_to
     for chunk in response:
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
+
+
+def call_ai_sync(messages: list, api_key: str, model: str, temperature: float, max_tokens: int, base_url: str) -> str:
+    """同步调用 AI — 返回完整结果，用于并行多线程"""
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=False,
+    )
+    return response.choices[0].message.content
+
+
+def run_parallel_queries(slots, slot_keys, prompt, temperature, max_tokens):
+    """并行调用所有槽位的 AI，同时发起请求"""
+    results = {}
+    errors = {}
+    lock = threading.Lock()
+
+    def query_slot(idx, slot):
+        api_key = slot_keys.get(idx, "")
+        if not api_key:
+            with lock:
+                results[idx] = None
+            return
+        config = PROVIDERS.get(slot["provider"], {})
+        base_url = config.get("base_url", "")
+        model = slot["model"]
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            response = call_ai_sync(messages, api_key, model, temperature, max_tokens, base_url)
+            with lock:
+                results[idx] = response
+        except Exception as e:
+            with lock:
+                errors[idx] = str(e)[:300]
+
+    with ThreadPoolExecutor(max_workers=len(slots)) as executor:
+        futures = {
+            executor.submit(query_slot, idx, slot): idx
+            for idx, slot in enumerate(slots)
+        }
+        for future in as_completed(futures):
+            future.result()  # 等待完成，异常已在 query_slot 内处理
+
+    return results, errors
 
 
 # ── 页面设置 ──────────────────────────────────────────────
@@ -249,6 +299,8 @@ if num_slots > 0:
     st.subheader(f"📊 {num_slots} 个 AI 对比")
     result_cols = st.columns(num_slots)
 
+    # ── 先渲染所有槽位占位符 ──
+    placeholders = []
     for idx, (col, slot) in enumerate(zip(result_cols, st.session_state.slots)):
         with col:
             provider = slot["provider"]
@@ -259,34 +311,48 @@ if num_slots > 0:
 
             st.markdown(f"**Slot {idx + 1}**")
             st.caption(f"{provider} · `{model}`  {price}")
+            ph = st.empty()
+            placeholders.append((idx, ph, api_key, model))
 
-            placeholder = st.empty()
+    # ── 处理 Prompt ──
+    if prompt:
+        # 检查是否有新回复需要获取
+        need_query = []
+        for idx, ph, api_key, model in placeholders:
+            slot_key = f"{idx}_{prompt}_{model}"
+            if slot_key not in st.session_state.slot_responses and api_key:
+                need_query.append(idx)
+                ph.info("⚡ 思考中...")
+            elif not api_key:
+                ph.warning("🔑 需要 API Key")
 
-            if not api_key:
-                placeholder.warning("🔑 需要 API Key")
-            elif prompt:
-                slot_key = f"{idx}_{prompt}_{model}"
-                if slot_key not in st.session_state.slot_responses:
-                    with st.spinner("⏳ 思考中..."):
-                        try:
-                            messages = [{"role": "user", "content": prompt}]
-                            full = ""
-                            for token in call_ai(
-                                messages, api_key, model, temperature, max_tokens,
-                                config.get("base_url", ""),
-                            ):
-                                full += token
-                                placeholder.markdown(full + "▌")
-                            placeholder.markdown(full)
-                            st.session_state.slot_responses[slot_key] = full
-                        except Exception as e:
-                            error_msg = str(e)[:200]
-                            placeholder.error(f"❌ {error_msg}")
-                            st.session_state.slot_responses[slot_key] = f"**错误**: {error_msg}"
-                else:
-                    placeholder.markdown(st.session_state.slot_responses[slot_key])
-            else:
-                placeholder.info("等待输入...")
+        if need_query:
+            # 🚀 并行：所有 AI 同时发起请求
+            with st.spinner(f"⚡ {len(need_query)} 个 AI 同时思考中..."):
+                slots_for_query = [st.session_state.slots[i] for i in need_query]
+                keys_for_query = {new_i: st.session_state.slot_keys.get(orig_i, "")
+                                  for new_i, orig_i in enumerate(need_query)}
+                results, errors = run_parallel_queries(
+                    slots_for_query, keys_for_query,
+                    prompt, temperature, max_tokens,
+                )
+
+            # 保存结果
+            for new_i, orig_i in enumerate(need_query):
+                model = st.session_state.slots[orig_i]["model"]
+                slot_key = f"{orig_i}_{prompt}_{model}"
+                if new_i in results and results[new_i] is not None:
+                    st.session_state.slot_responses[slot_key] = results[new_i]
+                elif new_i in errors:
+                    st.session_state.slot_responses[slot_key] = f"**错误**: {errors[new_i]}"
+
+            st.rerun()
+
+        # 显示已有结果
+        for idx, ph, api_key, model in placeholders:
+            slot_key = f"{idx}_{prompt}_{model}"
+            if slot_key in st.session_state.slot_responses:
+                ph.markdown(st.session_state.slot_responses[slot_key])
 
 # ── 编译合成 ──
 if prompt and num_slots > 1:
