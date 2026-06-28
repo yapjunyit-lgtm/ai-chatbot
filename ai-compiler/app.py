@@ -276,6 +276,7 @@ with st.sidebar:
         if st.button("🗑 清空回复", use_container_width=True):
             st.session_state.slot_responses = {}
             st.session_state.compile_response = ""
+            st.session_state.current_prompt = ""
             st.rerun()
     with col2:
         if st.button("🗑 清空 Key", use_container_width=True):
@@ -314,12 +315,18 @@ if num_slots > 0:
             ph = st.empty()
             placeholders.append((idx, ph, api_key, model))
 
-    # ── 处理 Prompt ──
+    # ── Prompt 持久化（st.rerun 后 chat_input 变 None）
     if prompt:
+        st.session_state.current_prompt = prompt
+
+    current_prompt = st.session_state.get("current_prompt", "")
+
+    # ── 处理 Prompt ──
+    if current_prompt:
         # 检查是否有新回复需要获取
         need_query = []
         for idx, ph, api_key, model in placeholders:
-            slot_key = f"{idx}_{prompt}_{model}"
+            slot_key = f"{idx}_{current_prompt}_{model}"
             if slot_key not in st.session_state.slot_responses and api_key:
                 need_query.append(idx)
                 ph.info("⚡ 思考中...")
@@ -334,13 +341,13 @@ if num_slots > 0:
                                   for new_i, orig_i in enumerate(need_query)}
                 results, errors = run_parallel_queries(
                     slots_for_query, keys_for_query,
-                    prompt, temperature, max_tokens,
+                    current_prompt, temperature, max_tokens,
                 )
 
             # 保存结果
             for new_i, orig_i in enumerate(need_query):
                 model = st.session_state.slots[orig_i]["model"]
-                slot_key = f"{orig_i}_{prompt}_{model}"
+                slot_key = f"{orig_i}_{current_prompt}_{model}"
                 if new_i in results and results[new_i] is not None:
                     st.session_state.slot_responses[slot_key] = results[new_i]
                 elif new_i in errors:
@@ -350,17 +357,17 @@ if num_slots > 0:
 
         # 显示已有结果
         for idx, ph, api_key, model in placeholders:
-            slot_key = f"{idx}_{prompt}_{model}"
+            slot_key = f"{idx}_{current_prompt}_{model}"
             if slot_key in st.session_state.slot_responses:
                 ph.markdown(st.session_state.slot_responses[slot_key])
 
 # ── 编译合成 ──
-if prompt and num_slots > 1:
+if current_prompt and num_slots > 1:
     # 检查至少 2 个槽位有回复
     ready_slots = []
     for idx in range(num_slots):
         slot = st.session_state.slots[idx]
-        slot_key = f"{idx}_{prompt}_{slot['model']}"
+        slot_key = f"{idx}_{current_prompt}_{slot['model']}"
         if slot_key in st.session_state.slot_responses:
             ready_slots.append((idx, slot, slot_key))
 
@@ -397,7 +404,7 @@ if prompt and num_slots > 1:
 
             compile_messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"原始问题：{prompt}\n\n各 AI 回答：{responses_text}\n\n请综合编译。"},
+                {"role": "user", "content": f"原始问题：{current_prompt}\n\n各 AI 回答：{responses_text}\n\n请综合编译。"},
             ]
 
             st.markdown("---")
