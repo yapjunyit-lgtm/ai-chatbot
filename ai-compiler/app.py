@@ -22,7 +22,7 @@ PROVIDERS = {
     "Google Gemini": {
         "prefixes": ["AIza"],
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+        "models": ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro"],
         "price": "🆓 免费层",
         "free_tier": "每分钟60次免费",
         "get_key_url": "https://aistudio.google.com/apikey",
@@ -72,7 +72,7 @@ PROVIDERS = {
 # ── 默认槽位（最便宜方案）───────────────────────────────────
 DEFAULT_SLOTS = [
     {"provider": "DeepSeek", "model": "deepseek-chat"},
-    {"provider": "Google Gemini", "model": "gemini-2.0-flash"},
+    {"provider": "Google Gemini", "model": "gemini-2.5-flash-lite"},
     {"provider": "Groq", "model": "llama-3.1-8b-instant"},
 ]
 
