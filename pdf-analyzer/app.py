@@ -174,10 +174,15 @@ with col1:
                 try:
                     reader = PdfReader(BytesIO(f.getvalue()))
                     text_parts = []
-                    for page in reader.pages:
+                    for i, page in enumerate(reader.pages):
                         page_text = page.extract_text()
                         if page_text:
-                            text_parts.append(page_text)
+                            # 按段落分割，标注页码
+                            paragraphs = [p.strip() for p in page_text.split("\n\n") if p.strip()]
+                            tagged_paragraphs = []
+                            for j, para in enumerate(paragraphs):
+                                tagged_paragraphs.append(f"[第{i+1}页·第{j+1}段] {para}")
+                            text_parts.append("\n".join(tagged_paragraphs))
 
                     full_text = "\n\n".join(text_parts)
                     all_texts[f.name] = {
@@ -232,8 +237,26 @@ with col2:
                             placeholder = st.empty()
                             full = ""
                             try:
-                                system_prompt = "你是一个专业的文档分析师。请用中文总结以下文档的核心内容，包括：1) 文档类型和主题 2) 3-5 个关键要点 3) 主要结论或发现。用简洁的要点形式呈现。"
-                                text_to_summarize = data["text"][:8000]  # 限制长度
+                                system_prompt = """你是一个专业的文档分析师。请用中文总结以下文档的核心内容。
+
+文本中的引用标记格式：[第X页·第Y段] 表示第X页第Y段。
+
+请按以下结构输出：
+
+### 📄 文档类型和主题
+（一句话概括）
+
+### 🔑 关键要点
+1. 要点一 （第X页，第Y段）
+2. 要点二 （第X页，第Y段）
+3. 要点三 （第X页，第Y段）
+...（3-5 个）
+
+### 📌 主要结论
+（1-2 句话总结，附带页面引用）
+
+**每个要点必须附带具体的页码和段落引用。**"""
+                                text_to_summarize = data["text"][:10000]  # 增加长度容纳标记
 
                                 messages = [
                                     {"role": "system", "content": system_prompt},
@@ -284,17 +307,25 @@ with col2:
                             # 构建上下文（取所有文档文本）
                             context_parts = []
                             for name, data in pdf_texts.items():
-                                context_parts.append(f"【文档：{name}】\n{data['text'][:6000]}")
+                                context_parts.append(f"【文档：{name}】\n{data['text'][:8000]}")
 
                             context = "\n\n---\n\n".join(context_parts)
 
-                            system_prompt = "你是一个精确的文档分析助手。请严格基于提供的文档内容回答问题。如果文档中没有相关信息，请明确说明'文档中未提及此内容'。用中文回答。"
+                            system_prompt = """你是一个精确的文档分析助手。请严格基于提供的文档内容回答问题。
+
+文本中的引用标记格式：[第X页·第Y段] 表示第X页第Y段。
+
+回答规则：
+1. 每个观点/事实必须附带具体的引用来源，格式：（第X页，第Y段）
+2. 如果文档中没有相关信息，请明确说明'文档中未提及此内容'
+3. 如有多个出处，列出所有相关引用
+4. 用中文回答，清晰分段"""
                             messages = [
                                 {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": f"参考文档内容：\n\n{context}\n\n---\n\n用户问题：{question}\n\n请基于以上文档回答。"},
                             ]
 
-                            for token in call_ai(messages, api_key, model, 0.5, 2048, is_claude, active_config.get("base_url")):
+                            for token in call_ai(messages, api_key, model, 0.5, 3072, is_claude, active_config.get("base_url")):
                                 full += token
                                 placeholder.markdown(full + "▌")
 
