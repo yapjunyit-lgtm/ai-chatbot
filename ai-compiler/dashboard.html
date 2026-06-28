@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ AI Compiler Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e4e6ec;
+    --sub: #8b8fa3;
+    --accent: #667eea;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --blue: #60a5fa;
+    --purple: #a78bfa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+  .container { max-width: 900px; width: 100%; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .sub { color: var(--sub); margin-bottom: 32px; font-size: 14px; }
+
+  /* Prompt Input */
+  .prompt-section { margin-bottom: 28px; }
+  textarea {
+    width: 100%; height: 120px;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; font-size: 15px; resize: vertical;
+    font-family: inherit; line-height: 1.5;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .char-count { text-align: right; color: var(--sub); font-size: 12px; margin-top: 4px; }
+
+  /* Provider Grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 32px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; cursor: pointer;
+    transition: all 0.15s; position: relative; overflow: hidden;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card:active { transform: scale(0.98); }
+  .card .icon { font-size: 28px; margin-bottom: 8px; }
+  .card .name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .card .domain { color: var(--sub); font-size: 12px; margin-bottom: 6px; }
+  .card .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-free { background: #065f46; color: #34d399; }
+  .badge-cheap { background: #78350f; color: #fbbf24; }
+  .badge-paid { background: #7f1d1d; color: #f87171; }
+  .card .copied {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--accent); color: white; padding: 3px 8px;
+    border-radius: 6px; font-size: 11px; opacity: 0; transition: opacity 0.2s;
+  }
+  .card .copied.show { opacity: 1; }
+
+  /* History */
+  .history { margin-top: 40px; }
+  .history h3 { font-size: 16px; margin-bottom: 12px; color: var(--sub); }
+  .history-item {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+    cursor: pointer; font-size: 13px; color: var(--sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .history-item:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: white; padding: 10px 24px;
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Tips */
+  .tips {
+    margin-top: 32px; padding: 16px 20px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .tips h3 { font-size: 14px; margin-bottom: 8px; }
+  .tips p { color: var(--sub); font-size: 13px; line-height: 1.6; }
+  .tips kbd {
+    background: #2a2d3a; padding: 1px 6px; border-radius: 4px;
+    font-size: 12px; border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ AI Compiler Dashboard</h1>
+  <p class="sub">一个 Prompt → 一键打开 ChatGPT · Gemini · Claude · DeepSeek · Grok → 粘贴即用</p>
+
+  <!-- Prompt -->
+  <div class="prompt-section">
+    <textarea id="prompt" placeholder="在这里输入你的 Prompt...&#10;&#10;然后点击下方任意 AI 卡片，Prompt 自动复制，AI 聊天页在新标签页打开，Ctrl+V 粘贴即可。"></textarea>
+    <div class="char-count"><span id="count">0</span> 字符</div>
+  </div>
+
+  <!-- Provider Cards -->
+  <div class="grid" id="grid"></div>
+
+  <!-- Tips -->
+  <div class="tips">
+    <h3>💡 怎么用</h3>
+    <p>1. 在上面输入 Prompt → 2. 点击 AI 卡片（自动复制 + 打开）→ 3. 在打开的页面按 <kbd>Ctrl+V</kbd> 粘贴 → 4. 重复点击其他卡片</p>
+    <p style="margin-top:6px;">🔹 <b>免费方案</b>：Gemini + DeepSeek + Groq 都提供免费 API，几乎不花钱。</p>
+  </div>
+
+  <!-- History -->
+  <div class="history" id="history"><h3>📋 最近使用</h3></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">✅ 已复制！在新标签页 Ctrl+V 粘贴</div>
+</div>
+
+<script>
+// ── AI 供应商数据 ──
+const providers = [
+  { name: 'ChatGPT', icon: '🧠', domain: 'chatgpt.com', url: 'https://chatgpt.com/', badge: '免费层', badgeClass: 'badge-free' },
+  { name: 'Gemini', icon: '🌌', domain: 'gemini.google.com', url: 'https://gemini.google.com/app', badge: '🆓 免费', badgeClass: 'badge-free' },
+  { name: 'Claude', icon: '🎭', domain: 'claude.ai', url: 'https://claude.ai/new', badge: '免费层', badgeClass: 'badge-free' },
+  { name: 'DeepSeek', icon: '🐋', domain: 'chat.deepseek.com', url: 'https://chat.deepseek.com/', badge: '💰 极便宜', badgeClass: 'badge-cheap' },
+  { name: 'Grok (xAI)', icon: '🚀', domain: 'grok.com', url: 'https://grok.com/', badge: '免费层', badgeClass: 'badge-free' },
+  { name: 'Perplexity', icon: '🔍', domain: 'perplexity.ai', url: 'https://www.perplexity.ai/', badge: '免费层', badgeClass: 'badge-free' },
+  { name: 'Mistral', icon: '💨', domain: 'chat.mistral.ai', url: 'https://chat.mistral.ai/', badge: '🆓 免费', badgeClass: 'badge-free' },
+  { name: 'HuggingChat', icon: '🤗', domain: 'huggingface.co/chat', url: 'https://huggingface.co/chat/', badge: '🆓 免费', badgeClass: 'badge-free' },
+  { name: 'Copilot', icon: '💻', domain: 'copilot.microsoft.com', url: 'https://copilot.microsoft.com/', badge: '🆓 免费', badgeClass: 'badge-free' },
+];
+
+// ── 渲染卡片 ──
+const grid = document.getElementById('grid');
+providers.forEach((p, i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="copied" id="copied-${i}">Copied!</div>
+    <div class="icon">${p.icon}</div>
+    <div class="name">${p.name}</div>
+    <div class="domain">${p.domain}</div>
+    <span class="badge ${p.badgeClass}">${p.badge}</span>
+  `;
+  card.addEventListener('click', () => handleClick(i, p));
+  grid.appendChild(card);
+});
+
+// ── 处理点击 ──
+function handleClick(idx, provider) {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) {
+    // 没有 prompt 也打开，让用户自己在那边输入
+    window.open(provider.url, '_blank');
+    return;
+  }
+
+  // 复制到剪贴板
+  navigator.clipboard.writeText(prompt).then(() => {
+    // 显示 copied 标记
+    const badge = document.getElementById(`copied-${idx}`);
+    badge.classList.add('show');
+    setTimeout(() => badge.classList.remove('show'), 1500);
+
+    // 显示 toast
+    showToast(`✅ 已复制！在 ${provider.name} 页面 Ctrl+V 粘贴`);
+
+    // 打开 AI 网站
+    window.open(provider.url, '_blank');
+
+    // 保存历史
+    saveHistory(prompt);
+  }).catch(() => {
+    // 剪贴板失败时的后备方案
+    window.open(provider.url, '_blank');
+    showToast('⚠️ 请手动复制 Prompt');
+    saveHistory(prompt);
+  });
+}
+
+// ── Toast ──
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ── 历史记录 ──
+function saveHistory(prompt) {
+  let history = JSON.parse(localStorage.getItem('aicompiler_history') || '[]');
+  history = [prompt, ...history.filter(h => h !== prompt)].slice(0, 20);
+  localStorage.setItem('aicompiler_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = JSON.parse(localStorage.getItem('aicompiler_history') || '[]');
+  const container = document.getElementById('history');
+  container.innerHTML = '<h3>📋 最近使用</h3>';
+  history.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.textContent = h;
+    div.title = '点击重新使用';
+    div.addEventListener('click', () => {
+      document.getElementById('prompt').value = h;
+      document.getElementById('count').textContent = h.length;
+      document.getElementById('prompt').focus();
+      showToast('📋 已填入 Prompt，点击 AI 卡片开始');
+    });
+    container.appendChild(div);
+  });
+}
+
+// ── 字符计数 ──
+document.getElementById('prompt').addEventListener('input', (e) => {
+  document.getElementById('count').textContent = e.target.value.length;
+});
+
+// ── 初始化 ──
+renderHistory();
+</script>
+</body>
+</html>
