@@ -2,13 +2,16 @@
 📄 AI PDF 分析器 — 上传 PDF，一键摘要，智能问答
 支持: OpenAI / DeepSeek / Groq / Claude / 自定义接口
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
-import os
 from io import BytesIO
 from pypdf import PdfReader
 from openai import OpenAI
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from shared.style import inject_css, header, footer
 
 load_dotenv()
 
@@ -98,9 +101,8 @@ st.set_page_config(
     page_icon="📄",
     layout="wide",
 )
-
-st.title("📄 AI PDF 分析器")
-st.caption("上传 PDF → 一键摘要 → 智能问答。律师、HR、研究员必备。")
+inject_css()
+header("📄", "AI PDF Analyzer", "Upload PDF → one-click summary with citations → smart Q&A")
 
 # ── 侧边栏 ────────────────────────────────────────────────
 with st.sidebar:
@@ -356,6 +358,4 @@ with col2:
                     except Exception as e:
                         st.error(f"❌ {str(e)[:200]}")
 
-# ── Footer ────────────────────────────────────────────────
-st.divider()
-st.caption("💡 提示：上传 PDF 后，先点「一键摘要」快速了解内容，再用「问答」深入提问。")
+footer("💡 Tip: Upload PDF → Summary first → then Q&A for deep-dive questions.")

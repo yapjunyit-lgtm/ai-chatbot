@@ -2,6 +2,9 @@
 🔍 AI Image Analyzer & Prompt Generator — 上传图片，AI 分析视觉元素并生成图像提示词
 支持: OpenAI GPT-4o / DeepSeek / Gemini / 自定义 OpenAI 兼容接口
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
 import os
 import base64
@@ -10,6 +13,7 @@ from io import BytesIO
 from PIL import Image
 from openai import OpenAI
 from dotenv import load_dotenv
+from shared.style import inject_css, header, footer
 
 load_dotenv()
 
@@ -180,9 +184,8 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide",
 )
-
-st.title("🔍 Image Analyzer & Prompt Generator")
-st.caption("上传图片 → AI 分析视觉元素 → 生成 Midjourney/DALL-E 提示词 → 查找相似风格")
+inject_css()
+header("🔍", "Image Analyzer & Prompt Generator", "Upload → AI analyzes → generates prompt → customise → find similar styles")
 
 # ── 侧边栏：API 设置 ──────────────────────────────────────
 with st.sidebar:
@@ -478,6 +481,4 @@ else:
         5. **查找相似** — 一键在 Google Images 和 Pinterest 搜索相似风格
         """)
 
-# ── 页脚 ──
-st.divider()
-st.caption("🔍 Image Analyzer | 支持 OpenAI GPT-4o · Google Gemini · 多供应商 | 你的 API Key 只保存在本地")
+footer("🔍 Image Analyzer | OpenAI GPT-4o · Google Gemini · Multi-provider")

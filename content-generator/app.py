@@ -2,12 +2,16 @@
 ✍️ AI 内容生成器 — 一键生成 SEO 文章、社媒帖子、营销文案
 支持: OpenAI / DeepSeek / Groq / Claude / 自定义接口
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
 import os
 from datetime import datetime
 from openai import OpenAI
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from shared.style import inject_css, header, footer
 
 load_dotenv()
 
@@ -130,9 +134,8 @@ def call_ai(messages: list, api_key: str, model: str, temperature: float, max_to
 
 # ── 页面设置 ──────────────────────────────────────────────
 st.set_page_config(page_title="✍️ AI 内容生成器", page_icon="✍️", layout="wide")
-
-st.title("✍️ AI 内容生成器")
-st.caption("一键生成 SEO 文章 · 社媒帖子 · 营销文案 · 邮件 · 产品描述")
+inject_css()
+header("✍️", "AI Content Generator", "SEO · Social · Email · Ads · Scripts — 10 types, 8 tones, 7 platforms")
 
 # ── 初始化 session ─────────────────────────────────────────
 if "content_history" not in st.session_state:
@@ -307,5 +310,4 @@ if st.session_state.content_history:
         with st.expander(f"{item['type']} · {item['topic'][:40]} · {item['time']}"):
             st.markdown(item["content"])
 
-st.divider()
-st.caption("💡 提示：写好主题 + 关键词 + 目标受众，AI 生成的内容质量最高。")
+footer("💡 Tip: Good topic + keywords + target audience = best AI-generated content.")

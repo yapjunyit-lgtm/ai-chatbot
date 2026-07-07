@@ -2,6 +2,9 @@
 📊 AI 数据分析师 — 上传表格，自动洞察 + 图表 + 自然语言问答
 支持: OpenAI / DeepSeek / Groq / Claude / 自定义接口
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -10,7 +13,7 @@ from io import BytesIO
 from openai import OpenAI
 from anthropic import Anthropic
 from dotenv import load_dotenv
-import os
+from shared.style import inject_css, header, footer
 
 load_dotenv()
 
@@ -114,8 +117,8 @@ def summarize_dataframe(df):
 
 # ── 页面设置 ──────────────────────────────────────────────
 st.set_page_config(page_title="📊 AI 数据分析师", page_icon="📊", layout="wide")
-st.title("📊 AI 数据分析师")
-st.caption("上传 CSV / Excel → 自动图表 + AI 洞察 + 自然语言提问")
+inject_css()
+header("📊", "AI Data Analyst", "Upload CSV/Excel → auto charts + AI insights + natural language Q&A")
 
 # ── 侧边栏 ────────────────────────────────────────────────
 with st.sidebar:
@@ -364,5 +367,4 @@ else:
     ```
     """)
 
-st.divider()
-st.caption("💡 提示：数据包含中文列名时，图表可能显示为方块 — 这是 Plotly 字体问题，不影响分析结果。")
+footer("💡 Tip: Chinese column names may show as squares in charts — a Plotly font issue.")

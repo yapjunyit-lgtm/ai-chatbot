@@ -2,9 +2,13 @@
 ⚡ AI Compiler v3 — 一个 Prompt 同时发给多个 AI，并排对比，一键编译
 💰 极致省钱：每家默认最便宜模型，旁边标价格，🆓 免费模型优先
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
+from shared.style import inject_css, header, footer
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -152,9 +156,8 @@ def run_parallel_queries(slots, slot_keys, prompt, temperature, max_tokens):
 
 # ── 页面设置 ──────────────────────────────────────────────
 st.set_page_config(page_title="⚡ AI Compiler", page_icon="⚡", layout="wide")
-
-st.title("⚡ AI Compiler")
-st.caption("一个 Prompt → 多个 AI 同时回答 → 并排对比 → 一键编译最优答案")
+inject_css()
+header("⚡", "AI Compiler", "One prompt → multiple AIs in parallel → compare → compile the best answer")
 
 # ── 初始化 session ─────────────────────────────────────────
 if "slots" not in st.session_state:
@@ -428,5 +431,4 @@ if current_prompt and num_slots > 1:
         st.caption("⏳ 等待至少 2 个 AI 完成回复...")
 
 # ── Footer ────────────────────────────────────────────────
-st.divider()
-st.caption("💰 省钱技巧：DeepSeek ¥0.14 + Gemini 🆓 + Groq 🆓 = 一次对比几乎免费。每家注册拿免费 Key，不花冤枉钱。")
+footer("💰 Save money: DeepSeek ¥0.14 + Gemini 🆓 + Groq 🆓 = one comparison nearly free.")

@@ -7,6 +7,7 @@ import os
 from openai import OpenAI
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from shared.style import inject_css, header, footer
 
 load_dotenv()
 
@@ -62,9 +63,8 @@ st.set_page_config(
     page_icon="🤖",
     layout="centered",
 )
-
-st.title("🤖 Universal AI Chatbot")
-st.caption("自动识别 API Key — 支持 OpenAI · DeepSeek · Groq · Claude · 自定义")
+inject_css()
+header("🤖", "Universal AI Chatbot", "Auto-detects API keys — OpenAI · DeepSeek · Groq · Claude · Custom")
 
 # ── 侧边栏 ────────────────────────────────────────────────
 with st.sidebar:
